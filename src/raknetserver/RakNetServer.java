@@ -1,14 +1,10 @@
 package raknetserver;
 
-import java.net.InetSocketAddress;
-
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
-import io.netty.channel.ChannelFactory;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.DefaultEventLoopGroup;
-import io.netty.channel.ServerChannel;
 import io.netty.handler.timeout.ReadTimeoutHandler;
 import raknetserver.pipeline.ecnapsulated.EncapsulatedPacketInboundOrderer;
 import raknetserver.pipeline.ecnapsulated.EncapsulatedPacketOutboundOrder;
@@ -23,8 +19,9 @@ import raknetserver.pipeline.raknet.RakNetPacketConnectionEstablishHandler.PingH
 import raknetserver.pipeline.raknet.RakNetPacketDecoder;
 import raknetserver.pipeline.raknet.RakNetPacketEncoder;
 import raknetserver.pipeline.raknet.RakNetPacketReliabilityHandler;
-import raknetserver.utils.Constants;
 import udpserversocketchannel.channel.UdpServerChannel;
+
+import java.net.InetSocketAddress;
 
 public class RakNetServer {
 
@@ -45,12 +42,7 @@ public class RakNetServer {
 	public void start() {
 		ServerBootstrap bootstrap = new ServerBootstrap()
 		.group(new DefaultEventLoopGroup())
-		.channelFactory(new ChannelFactory<ServerChannel>() {
-			@Override
-			public ServerChannel newChannel() {
-				return new UdpServerChannel(Constants.UDP_IO_THREADS);
-			}
-		})
+		.channel(UdpServerChannel.class)
 		.childHandler(new ChannelInitializer<Channel>() {
 			@Override
 			protected void initChannel(Channel channel) throws Exception {
