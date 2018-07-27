@@ -21,8 +21,8 @@ public class RakNetEncapsulatedData implements RakNetPacket {
 		packets.add(epacket);
 	}
 
-	public boolean isRTOTimeout() {
-		return sendtime + rto < System.currentTimeMillis();
+	public boolean isRTOTimeout(long now) {
+		return sendtime + rto < now;
 	}
 
 	public int getRTT() {
