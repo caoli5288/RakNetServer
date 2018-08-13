@@ -13,6 +13,7 @@ public class RakNetEncapsulatedData implements RakNetPacket {
 
 	private int rto;
 	private long sendtime;
+	private int sendcount;
 
 	public RakNetEncapsulatedData() {
 	}
@@ -29,8 +30,12 @@ public class RakNetEncapsulatedData implements RakNetPacket {
 		return ((int) (System.currentTimeMillis() - sendtime));
 	}
 
+	public int sendcount() {
+		return sendcount;
+	}
+
 	public void updateRTO(int rxrto) {
-		if (sendtime == 0) {
+		if (sendcount++ == 0) {
 			rto = rxrto;
 		} else {
 			rto = Math.max(rto * 2, rxrto);

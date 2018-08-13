@@ -55,7 +55,7 @@ public class RakNetPacketConnectionEstablishHandler extends SimpleChannelInbound
 
 	protected void handleConnectionRequest1(ChannelHandlerContext ctx, RakNetConnectionRequest1 connectionRequest1) {
 		if (connectionRequest1.getRakNetProtocolVersion() == RakNetInvalidVersion.VALID_VERSION) {
-			ctx.writeAndFlush(new RakNetConnectionReply1(connectionRequest1.getMtu())).addListener(ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE);
+			ctx.writeAndFlush(new RakNetConnectionReply1(Math.min(RakNetConstants.MAXIMUM_MTU_LEN, connectionRequest1.getMtu()))).addListener(ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE);
 		} else {
 			ctx.writeAndFlush(new RakNetInvalidVersion()).addListener(ChannelFutureListener.CLOSE);
 		}

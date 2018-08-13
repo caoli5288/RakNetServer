@@ -52,6 +52,8 @@ public class RakNetPacketReliabilityHandler extends ChannelDuplexHandler {
 	@Override
 	public void channelInactive(ChannelHandlerContext ctx) throws Exception {
 		rtotask.cancel(false);
+		sentPackets.clear();
+		sendque.clear();
 		super.channelInactive(ctx);
 	}
 
@@ -68,6 +70,11 @@ public class RakNetPacketReliabilityHandler extends ChannelDuplexHandler {
 		if (sentPackets.isEmpty()) {
 			return;
 		}
+//		if (sendque.size() > Constants.SND_QUEUE_LIMIT) {
+//			ctx.fireExceptionCaught(new ChannelException(String.format("raknet sendqueue size(%s) > limit(%s)", sendque.size(), Constants.SND_QUEUE_LIMIT)));
+//			ctx.close();
+//			return;
+//		}
 		long now = System.currentTimeMillis();
 		RecyclableArrayList list = RecyclableArrayList.newInstance();
 		try {
@@ -125,7 +132,7 @@ public class RakNetPacketReliabilityHandler extends ChannelDuplexHandler {
 	private void confirmRakNetPackets(int idstart, int idfinish) {
 		for (int id = idstart; id <= idfinish; id++) {
 			RakNetEncapsulatedData pk = sentPackets.remove(id);
-			if (pk != null) {
+			if (pk != null && pk.sendcount() == 1) {
 				updateRxRTO(pk.getRTT());
 			}
 		}
