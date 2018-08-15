@@ -3,6 +3,8 @@ package raknetserver.packet.raknet;
 import io.netty.buffer.ByteBuf;
 import raknetserver.packet.EncapsulatedPacket;
 import raknetserver.packet.RakNetDataSerializer;
+import raknetserver.utils.Constants;
+import raknetserver.utils.Utils;
 
 import java.util.ArrayList;
 
@@ -38,9 +40,13 @@ public class RakNetEncapsulatedData implements RakNetPacket {
 		if (sendcount++ == 0) {
 			rto = rxrto;
 		} else {
-			rto = Math.max(rto * 2, rxrto);
+			rto = Utils.bound(rto * 2, rxrto, Constants.RTO_MAX);
 		}
 		sendtime = System.currentTimeMillis();
+	}
+
+	public int getRTO() {
+		return rto;
 	}
 
 	@Override

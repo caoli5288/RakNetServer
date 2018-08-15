@@ -1,6 +1,7 @@
 package raknetserver.pipeline.raknet;
 
 import io.netty.channel.ChannelDuplexHandler;
+import io.netty.channel.ChannelException;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
@@ -15,6 +16,7 @@ import raknetserver.packet.raknet.RakNetReliability.RakNetNACK;
 import raknetserver.utils.Constants;
 import raknetserver.utils.PacketHandlerRegistry;
 import raknetserver.utils.UINT;
+import raknetserver.utils.Utils;
 
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -101,7 +103,20 @@ public class RakNetPacketReliabilityHandler extends ChannelDuplexHandler {
 		}
 	}
 
+	public static class MaxRTOTimeException extends ChannelException {
+
+		public static final MaxRTOTimeException INSTANCE = new MaxRTOTimeException();
+
+		@Override
+		public synchronized Throwable fillInStackTrace() {
+			return this;
+		}
+	}
+
 	protected void sendRakPacket(ChannelHandlerContext ctx, RakNetEncapsulatedData pk, boolean flush) {
+		if (pk.getRTO() == Constants.RTO_MAX) {// We close channel if max allowed resend timeout
+			throw MaxRTOTimeException.INSTANCE;
+		}
 		pk.setSeqId(getNextRakSeqID());
 		pk.updateRTO(rxrto);
 		sentPackets.put(pk.getSeqId(), pk);
@@ -160,11 +175,7 @@ public class RakNetPacketReliabilityHandler extends ChannelDuplexHandler {
 			srtt = (7 * srtt + rtt) / 8;
 			if (srtt < 1) srtt = 1;
 		}
-		rxrto = bound(Constants.RTO_MIN, srtt + Math.max(Constants.RTO_INTERVAL, 4 * rxrtt), Constants.RTO_MAX);
-	}
-
-	private int bound(int lower, int middle, int upper) {
-		return Math.min(Math.max(lower, middle), upper);
+		rxrto = Utils.bound(Constants.RTO_MIN, srtt + Math.max(Constants.RTO_INTERVAL, 4 * rxrtt), Constants.RTO_MAX);
 	}
 
 	public void handleRakNetEncapsulatedData(ChannelHandlerContext ctx, RakNetEncapsulatedData packet) {

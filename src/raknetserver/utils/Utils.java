@@ -32,4 +32,8 @@ public class Utils {
 		}
 	}
 
+	public static int bound(int lower, int middle, int upper) {
+		return Math.min(Math.max(lower, middle), upper);
+	}
+
 }
