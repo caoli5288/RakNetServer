@@ -1,5 +1,7 @@
 package raknetserver.pipeline.raknet;
 
+import gnu.trove.iterator.TIntObjectIterator;
+import gnu.trove.map.hash.TIntObjectHashMap;
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelException;
 import io.netty.channel.ChannelFutureListener;
@@ -34,7 +36,7 @@ public class RakNetPacketReliabilityHandler extends ChannelDuplexHandler {
 		REGISTRY.register(RakNetNACK.class, (ctx, handler, packet) -> handler.handleRakNetNACK(ctx, packet));
 	}
 
-	protected final HashMap<Integer, RakNetEncapsulatedData> sentPackets = new HashMap<>();
+	protected final TIntObjectHashMap<RakNetEncapsulatedData> sentPackets = new TIntObjectHashMap<>();
 	private final Queue<RakNetEncapsulatedData> sendque = new LinkedList<>();
 
 	protected int lastReceivedSeqId = -1;
@@ -80,9 +82,13 @@ public class RakNetPacketReliabilityHandler extends ChannelDuplexHandler {
 		long now = System.currentTimeMillis();
 		RecyclableArrayList list = RecyclableArrayList.newInstance();
 		try {
-			for (RakNetEncapsulatedData data : sentPackets.values()) {
-				if (data.isRTOTimeout(now)) {
-					list.add(data);
+			TIntObjectIterator<RakNetEncapsulatedData> itr = sentPackets.iterator();
+			RakNetEncapsulatedData value;
+			while (itr.hasNext()) {
+				itr.advance();
+				value = itr.value();
+				if (value.isRTOTimeout(now)) {
+					list.add(value);
 				}
 			}
 			if (!list.isEmpty()) {
