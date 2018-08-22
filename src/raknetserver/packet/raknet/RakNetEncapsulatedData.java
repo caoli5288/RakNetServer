@@ -35,7 +35,7 @@ public class RakNetEncapsulatedData implements RakNetPacket {
 
 	@Override
 	public void decode(ByteBuf buf) {
-		id = RakNetDataSerializer.readTriad(buf);
+		id = buf.readUnsignedMediumLE();
 		while (buf.isReadable()) {
 			EncapsulatedPacket packet = new EncapsulatedPacket();
 			packet.decode(buf);
@@ -45,7 +45,7 @@ public class RakNetEncapsulatedData implements RakNetPacket {
 
 	@Override
 	public void encode(ByteBuf buf) {
-		RakNetDataSerializer.writeTriad(buf, id);
+		buf.writeMediumLE(id);
 		for (EncapsulatedPacket packet : packets) {
 			packet.encode(buf);
 		}

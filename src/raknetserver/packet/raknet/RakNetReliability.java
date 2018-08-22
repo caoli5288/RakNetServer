@@ -25,9 +25,9 @@ public class RakNetReliability implements RakNetPacket {
 		for (int i = 0; i < entries.length; i++) {
 			boolean single = buf.readBoolean();
 			if (single) {
-				entries[i] = new REntry(RakNetDataSerializer.readTriad(buf));
+				entries[i] = new REntry(buf.readUnsignedMediumLE());
 			} else {
-				entries[i] = new REntry(RakNetDataSerializer.readTriad(buf), RakNetDataSerializer.readTriad(buf));
+				entries[i] = new REntry(buf.readUnsignedMediumLE(), buf.readUnsignedMediumLE());
 			}
 		}
 	}
@@ -37,8 +37,8 @@ public class RakNetReliability implements RakNetPacket {
 		buf.writeShort(entries.length);
 		for (REntry entry : entries) {
 			buf.writeBoolean(false);
-			RakNetDataSerializer.writeTriad(buf, entry.idstart);
-			RakNetDataSerializer.writeTriad(buf, entry.idfinish);
+			buf.writeMediumLE(entry.idstart);
+			buf.writeMediumLE(entry.idfinish);
 		}
 	}
 
