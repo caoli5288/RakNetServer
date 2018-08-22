@@ -13,4 +13,5 @@ public class Constants {
 
 	public static final int SND_WINDOW = 128;
 	public static final int SND_QUEUE_LIMIT = SND_WINDOW * SND_WINDOW;
+	public static final int FAST_RESENT = 2;
 }

@@ -3,19 +3,15 @@ package raknetserver.packet.raknet;
 import io.netty.buffer.ByteBuf;
 import raknetserver.packet.EncapsulatedPacket;
 import raknetserver.packet.RakNetDataSerializer;
-import raknetserver.utils.Constants;
-import raknetserver.utils.Utils;
 
 import java.util.ArrayList;
 
 public class RakNetEncapsulatedData implements RakNetPacket {
 
-	private int seqId;
-	private final ArrayList<EncapsulatedPacket> packets = new ArrayList<EncapsulatedPacket>();
-
-	private int rto;
-	private long sendtime;
-	private int sendcount;
+	private final ArrayList<EncapsulatedPacket> packets = new ArrayList<>();
+	private int id;
+	private int skip;
+	private boolean ack;
 
 	public RakNetEncapsulatedData() {
 	}
@@ -24,34 +20,22 @@ public class RakNetEncapsulatedData implements RakNetPacket {
 		packets.add(epacket);
 	}
 
-	public boolean isRTOTimeout(long now) {
-		return sendtime + rto < now;
+    public boolean isAck() {
+		return ack;
 	}
 
-	public int getRTT() {
-		return ((int) (System.currentTimeMillis() - sendtime));
+	public void setAck(boolean ack) {
+		this.ack = ack;
 	}
 
-	public int sendcount() {
-		return sendcount;
-	}
-
-	public void updateRTO(int rxrto) {
-		if (sendcount++ == 0) {
-			rto = rxrto;
-		} else {
-			rto = Utils.bound(rto * 2, rxrto, Constants.RTO_MAX);
-		}
-		sendtime = System.currentTimeMillis();
-	}
-
-	public int getRTO() {
-		return rto;
+	public int skip() {
+		skip++;
+		return skip;
 	}
 
 	@Override
 	public void decode(ByteBuf buf) {
-		seqId = RakNetDataSerializer.readTriad(buf);
+		id = RakNetDataSerializer.readTriad(buf);
 		while (buf.isReadable()) {
 			EncapsulatedPacket packet = new EncapsulatedPacket();
 			packet.decode(buf);
@@ -61,18 +45,19 @@ public class RakNetEncapsulatedData implements RakNetPacket {
 
 	@Override
 	public void encode(ByteBuf buf) {
-		RakNetDataSerializer.writeTriad(buf, seqId);
+		RakNetDataSerializer.writeTriad(buf, id);
 		for (EncapsulatedPacket packet : packets) {
 			packet.encode(buf);
 		}
 	}
 
-	public int getSeqId() {
-		return seqId;
+	public int getId() {
+		return id;
 	}
 
-	public void setSeqId(int seqId) {
-		this.seqId = seqId;
+	public void setId(int id) {
+		skip = 0;
+		this.id = id;
 	}
 
 	public ArrayList<EncapsulatedPacket> getPackets() {
