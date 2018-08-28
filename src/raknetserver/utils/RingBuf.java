@@ -1,23 +1,28 @@
 package raknetserver.utils;
 
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.NoSuchElementException;
+
+import static raknetserver.utils.UInt.U24.between;
+import static raknetserver.utils.UInt.U24.delta;
 
 /**
  * RingBuf with u24 seq bound compatible with rak
  */
-public class RingBuf<T> {
+public class RingBuf<T> implements Iterable<T> {
 
     private final Object[] buf;
     private final int capacity;
     private final int mod;
     private int next;
     private int first;
+    private int length;
 
     public RingBuf(int power) {
         capacity = 1 << power;
         if (capacity > UInt.U24.MAX_VALUE) {
-            throw new IllegalArgumentException("power");
+            throw new IllegalArgumentException(String.format("capacity=%s,max=%s", capacity, UInt.U24.MAX_VALUE));
         }
         mod = capacity - 1;
         buf = new Object[capacity];
@@ -30,6 +35,7 @@ public class RingBuf<T> {
         buf[next & mod] = add;
         int out = next;
         next = UInt.U24.mod(next, 1);
+        length++;
         return out;
     }
 
@@ -38,7 +44,7 @@ public class RingBuf<T> {
     }
 
     public int length() {
-        return UInt.U24.delta(first, next);
+        return length;
     }
 
     /**
@@ -81,47 +87,42 @@ public class RingBuf<T> {
         if (isEmpty()) {
             throw new NoSuchElementException("remove");
         }
-        return (T) buf[first++ & mod];
+        T out = _look(first);
+        first = UInt.U24.mod(first, 1);
+        length--;
+        return out;
     }
 
     public void _shift() {
-        first++;
+        first = UInt.U24.mod(first, 1);
+        length--;
     }
 
     public boolean isEmpty() {
-        return length() == 0;
-    }
-
-    public void walk(IWalker<T> walker) {
-        _walk(first, next, walker);
-    }
-
-    private void _walk(int start, int bound, IWalker<T> walker) {
-        for (int _i = start; _i < bound; _i++) {
-            walker.walk(_i, (T) buf[_i & mod]);
-        }
-    }
-
-    public void walk(int start, IWalker<T> walker) throws IndexOutOfBoundsException {
-        if (!contains(start)) {
-            throw new IndexOutOfBoundsException("walk_start=" + start);
-        }
-        _walk(start, next, walker);
+        return length == 0;
     }
 
     public boolean contains(int id) {
-        int delta = UInt.U24.delta(id, next);
-        return delta > 0 && delta <= length();
+        if (isEmpty() || !(UInt.U24.mod(id) == id)) {
+            return false;
+        }
+        return between(first, next, id);
     }
 
-    public void walk(int start, int bound, IWalker<T> walker) throws IndexOutOfBoundsException {
-        if (!contains(start)) {
-            throw new IndexOutOfBoundsException("walk_start=" + start + ", buf_head=" + first);
+    @Override
+    public Range<T> iterator() {
+        return new Range<>(this, first, next);
+    }
+
+    public Range<T> iterator(int begin) {
+        return iterator(begin, next);
+    }
+
+    public Range<T> iterator(int begin, int bound) {
+        if ((begin != first && !contains(begin)) || delta(begin, bound) > delta(begin, next)) {
+            throw new IndexOutOfBoundsException(String.format("begin=%s,bound=%s,buf_first=%s,buf_bound=%s", begin, bound, first, next));
         }
-        if (bound < start || !contains(bound - 1)) {
-            throw new IndexOutOfBoundsException("walk_bound=" + bound + ", buf_tail=" + next);
-        }
-        _walk(start, bound, walker);
+        return new Range<>(this, begin, bound);
     }
 
     public int next() {
@@ -138,15 +139,46 @@ public class RingBuf<T> {
     }
 
     public void reset() {
-        next = first = 0;
+        length = next = first = 0;
     }
 
     public int remaining() {
         return capacity - length();
     }
 
-    public interface IWalker<T> {
+    public static class Range<T> implements Iterator<T>, Iterable<T> {
 
-        void walk(int id, T ele);
+        private final RingBuf<T> _buf;
+        private final int bound;
+        private int inext;
+        private int id;
+
+        private Range(RingBuf<T> buf, int begin, int bound) {
+            _buf = buf;
+            inext = begin;
+            this.bound = bound;
+        }
+
+        @Override
+        public boolean hasNext() {
+            return UInt.U24.delta(inext, bound) >= 1;
+        }
+
+        @Override
+        public T next() {
+            id = inext;
+            inext = UInt.U24.mod(inext, 1);
+            return _buf._look(id);
+        }
+
+        public int id() {
+            return id;
+        }
+
+        @Override
+        public Iterator<T> iterator() {
+            return this;
+        }
     }
+
 }

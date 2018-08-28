@@ -36,4 +36,8 @@ public class Utils {
 		return Math.min(Math.max(lower, middle), upper);
 	}
 
+	public static void debug(String msg) {
+		System.out.println(msg);
+	}
+
 }

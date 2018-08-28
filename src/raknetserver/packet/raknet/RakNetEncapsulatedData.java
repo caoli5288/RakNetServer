@@ -2,7 +2,7 @@ package raknetserver.packet.raknet;
 
 import io.netty.buffer.ByteBuf;
 import raknetserver.packet.EncapsulatedPacket;
-import raknetserver.packet.RakNetDataSerializer;
+import raknetserver.utils.Constants;
 
 import java.util.ArrayList;
 
@@ -13,6 +13,10 @@ public class RakNetEncapsulatedData implements RakNetPacket {
 	private int skip;
 	private boolean ack;
 
+	private int rto;
+	private long sendTime;
+	private int snd;
+
 	public RakNetEncapsulatedData() {
 	}
 
@@ -20,17 +24,45 @@ public class RakNetEncapsulatedData implements RakNetPacket {
 		packets.add(epacket);
 	}
 
-    public boolean isAck() {
+	public boolean isRtoTimeout(long now) {
+		return sendTime + rto < now;
+	}
+
+	public int getRtt(long now) {
+		return (int) (now - sendTime);
+	}
+
+	public boolean isAck() {
 		return ack;
 	}
 
-	public void setAck(boolean ack) {
-		this.ack = ack;
+	public int receive() {
+		ack = true;
+		return snd();
+	}
+
+	public int snd() {
+		return snd;
 	}
 
 	public int skip() {
 		skip++;
 		return skip;
+	}
+
+	public void set(int id, long now, int rxRto, boolean updateRto) {
+		this.id = id;
+		skip = 0;
+		if (++snd == 1) {
+			rto = rxRto;
+		} else if (updateRto) {
+			rto = Math.min(rto * 3 / 2, Constants.RTO_MAX);
+		}
+		sendTime = now;
+	}
+
+	public int getRto() {
+		return rto;
 	}
 
 	@Override
@@ -53,11 +85,6 @@ public class RakNetEncapsulatedData implements RakNetPacket {
 
 	public int getId() {
 		return id;
-	}
-
-	public void setId(int id) {
-		skip = 0;
-		this.id = id;
 	}
 
 	public ArrayList<EncapsulatedPacket> getPackets() {
