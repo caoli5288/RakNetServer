@@ -17,11 +17,22 @@ public class RakNetEncapsulatedData implements RakNetPacket {
 	private long sendTime;
 	private int snd;
 
+	private int length;
+
+	public int length() {
+		return length;
+	}
+
 	public RakNetEncapsulatedData() {
 	}
 
-	public RakNetEncapsulatedData(EncapsulatedPacket epacket) {
-		packets.add(epacket);
+	public RakNetEncapsulatedData(EncapsulatedPacket msg) {
+		append(msg);
+	}
+
+	public void append(EncapsulatedPacket msg) {
+		packets.add(msg);
+		length += msg.getDataSize();
 	}
 
 	public boolean isRtoTimeout(long now) {
@@ -56,7 +67,7 @@ public class RakNetEncapsulatedData implements RakNetPacket {
 		if (++snd == 1) {
 			rto = rxRto;
 		} else if (updateRto) {
-			rto = Math.min(rto * 3 / 2, Constants.RTO_MAX);
+			rto = Math.min(rto * 2, Constants.RTO_MAX);
 		}
 		sendTime = now;
 	}

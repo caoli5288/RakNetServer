@@ -1,5 +1,6 @@
 plugins {
 	id 'java'
+	id 'maven'
 }
 
 group 'raknetserver'
@@ -53,8 +54,8 @@ repositories {
 }
 
 dependencies {
-	compile fileTree(dir: dlDepsDir, include: '*.jar')
-	compile group: 'io.netty', name: 'netty-all', version: '4.1.22.Final'
+	compileOnly fileTree(dir: dlDepsDir, include: '*.jar')
+	compileOnly group: 'io.netty', name: 'netty-all', version: '4.1.22.Final'
 	compileOnly 'net.sf.trove4j:trove4j:3.0.3'
 	compileOnly 'org.projectlombok:lombok:1.18.0'
 }
