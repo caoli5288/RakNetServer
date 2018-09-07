@@ -111,30 +111,30 @@ public class RakNetPacketReliabilityHandler extends ChannelDuplexHandler {
     }
 
     public void handleRakNetACK(ChannelHandlerContext ctx, RakNetACK packet) {
-        long now = System.currentTimeMillis();
-        for (REntry entry : packet.getEntries()) {
-            handleAckEntry(ctx, entry, now);
+        long current = System.currentTimeMillis();
+        for (REntry ackEntry : packet.getEntries()) {
+            if (sndWindow.contains(ackEntry.idfinish)) {
+                handleAckEntry(ackEntry, current);
+            }
         }
         recycle();
-        flushQueue(ctx, now);
+        flushQueue(ctx, current);
     }
 
-    private void handleAckEntry(ChannelHandlerContext ctx, REntry entry, long now) {
-        if (!sndWindow.contains(entry.idfinish)) {
-            return;
-        }
-        int bound = UInt.U24.mod(entry.idfinish, 1);
+    private void handleAckEntry(REntry ackEntry, long now) {
+        int bound = UInt.U24.mod(ackEntry.idfinish, 1);
         RingBuf.Range<RakNetEncapsulatedData> range = sndWindow.iterator(sndWindow.first(), bound);
         for (RakNetEncapsulatedData ele : range) {
-            if (ele.isAck() || range.id() != ele.getId()) {// already changed
+            if (ele.isAck()) {
                 continue;
             }
-            if (UInt.U24.between(entry.idstart, bound, range.id())) {
+            if (UInt.U24.between(ackEntry.idstart, bound, range.id())) {
                 ele.setAck();
-//                int xmit = ele.getXmit();
-//                if (xmit == 1 || sRtt == 0) {
+                if (range.id() == ele.getId()) {
                     updateRxRto(ele.getRtt(now));
-//                }
+                } else {
+                    ManagementGroup.getRakNetPacketReliability().unneededReFlush++;
+                }
                 continue;
             }
             ele.setFastAck();
@@ -223,15 +223,15 @@ public class RakNetPacketReliabilityHandler extends ChannelDuplexHandler {
         }
         data.setFlush(this, sndWindow.add(data), current);
         int xmit = data.getXmit();
-        if (xmit >= Constants.MAX_RETRANSMISSION) {
-            ctx.fireExceptionCaught(ReadTimeoutException.INSTANCE);
-            ctx.close();
-            inactive = true;
-            return;
-        }
         if (xmit == 1) {
             ManagementGroup.getRakNetPacketReliability().msgToPacket++;
         } else {
+            if (xmit >= Constants.MAX_RETRANSMISSION) {
+                ctx.fireExceptionCaught(ReadTimeoutException.INSTANCE);
+                ctx.close();
+                inactive = true;
+                return;
+            }
             ManagementGroup.getRakNetPacketReliability().packetReFlushed++;
         }
         ManagementGroup.getRakNetPacketReliability().packetFlushed++;

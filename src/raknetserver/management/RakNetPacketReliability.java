@@ -15,6 +15,7 @@ public class RakNetPacketReliability implements RakNetPacketReliabilityMXBean {
     public int fastReFlushed;
     public int rtoReFlushed;
     public int nackReFlush;
+    public int unneededReFlush;
 
     @Override
     public long getMsgQueued() {
@@ -33,12 +34,12 @@ public class RakNetPacketReliability implements RakNetPacketReliabilityMXBean {
 
     @Override
     public ReFlush getReFlush() {
-        return new ReFlush(packetReFlushed, fastReFlushed, rtoReFlushed, nackReFlush);
+        return new ReFlush(packetReFlushed, fastReFlushed, rtoReFlushed, nackReFlush, unneededReFlush);
     }
 
     @Override
     public void reset() {
-        nackReFlush = rtoReFlushed = fastReFlushed = msgToPacket = msgQueued = packetFlushed = packetReFlushed = 0;
+        unneededReFlush = nackReFlush = rtoReFlushed = fastReFlushed = msgToPacket = msgQueued = packetFlushed = packetReFlushed = 0;
     }
 
     @Override
@@ -54,10 +55,11 @@ public class RakNetPacketReliability implements RakNetPacketReliabilityMXBean {
     @AllArgsConstructor
     public static class ReFlush {
 
-        public int total;
-        public int fastAck;
-        public int rto;
-        public int nack;
+        public int totalReFlush;
+        public int fastReFlush;
+        public int transTimeout;
+        public int noAck;
+        public int unneededReFlush;
     }
 
 }

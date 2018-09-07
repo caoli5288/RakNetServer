@@ -24,6 +24,9 @@ public class InternalPacketDecoder extends MessageToMessageDecoder<ByteBuf> {
 		}
 		int packetId = buf.readUnsignedByte();
 		InternalPacket packet = packetId == userPacketId ? new InternalUserData() : InternalPacketRegistry.getPacket(packetId);
+		if (packet == null) {
+			return;// just ignore and not disconnect
+		}
 		packet.decode(buf);
 		if (buf.readableBytes() > 0) {
 			throw new DecoderException(buf.readableBytes() + " bytes left after decoding packet " + packet.getClass());

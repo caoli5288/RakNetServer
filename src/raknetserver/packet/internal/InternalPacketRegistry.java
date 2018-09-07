@@ -42,7 +42,8 @@ public class InternalPacketRegistry {
 	public static InternalPacket getPacket(int id) {
 		Constructor<? extends InternalPacket> constr = idToPacket[id];
 		if (constr == null) {
-			throw new IllegalArgumentException(id + " is not a known(registered) RakNet internal packet");
+//			throw new IllegalArgumentException(id + " is not a known(registered) RakNet internal packet");
+			return null;
 		}
 		try {
 			return constr.newInstance();
