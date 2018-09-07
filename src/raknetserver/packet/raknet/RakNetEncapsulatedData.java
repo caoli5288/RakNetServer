@@ -1,7 +1,9 @@
 package raknetserver.packet.raknet;
 
 import io.netty.buffer.ByteBuf;
+import raknetserver.management.ManagementGroup;
 import raknetserver.packet.EncapsulatedPacket;
+import raknetserver.pipeline.raknet.RakNetPacketReliabilityHandler;
 import raknetserver.utils.Constants;
 
 import java.util.ArrayList;
@@ -10,18 +12,17 @@ public class RakNetEncapsulatedData implements RakNetPacket {
 
 	private final ArrayList<EncapsulatedPacket> packets = new ArrayList<>();
 	private int id;
-	private int skip;
-	private boolean ack;
+    private int fastAck;
+    private boolean ack;
 
-	private int rto;
-	private long sendTime;
-	private int snd;
+    private int rto;
+    private long flushTime;
+    private int xmit;
+
+    private long nextFlushTime;
+    private boolean needFlush;
 
 	private int length;
-
-	public int length() {
-		return length;
-	}
 
 	public RakNetEncapsulatedData() {
 	}
@@ -30,50 +31,70 @@ public class RakNetEncapsulatedData implements RakNetPacket {
 		append(msg);
 	}
 
+	public int length() {
+		return length;
+	}
+
 	public void append(EncapsulatedPacket msg) {
 		packets.add(msg);
 		length += msg.getDataSize();
 	}
 
-	public boolean isRtoTimeout(long now) {
-		return sendTime + rto < now;
+	public boolean isNeedFlush() {
+		return needFlush;
 	}
 
-	public int getRtt(long now) {
-		return (int) (now - sendTime);
+	public void setNeedFlush() {
+		needFlush = true;
 	}
 
 	public boolean isAck() {
 		return ack;
 	}
 
-	public int receive() {
+	public void setAck() {
 		ack = true;
-		return snd();
 	}
 
-	public int snd() {
-		return snd;
+	public int getRtt(long now) {
+		return (int) (now - flushTime);
 	}
 
-	public int skip() {
-		skip++;
-		return skip;
+    public int getXmit() {
+        return xmit;
+    }
+
+    public void setFastAck() {
+		fastAck++;
 	}
 
-	public void set(int id, long now, int rxRto, boolean updateRto) {
+	public void setFlush(RakNetPacketReliabilityHandler stream, int id, long current) {
 		this.id = id;
-		skip = 0;
-		if (++snd == 1) {
-			rto = rxRto;
-		} else if (updateRto) {
-			rto = Math.min(rto * 2, Constants.RTO_MAX);
+		xmit++;
+		if (xmit == 1) {
+			rto = stream.getRxRto() + Constants.RTO_INIT_APPEND;
 		}
-		sendTime = now;
+		nextFlushTime = current + rto;
+		fastAck = 0;
+		needFlush = false;
+		flushTime = current;
 	}
 
-	public int getRto() {
-		return rto;
+	public void update(RakNetPacketReliabilityHandler stream, long current) {
+		if (needFlush) {// nack set need flush
+			ManagementGroup.getRakNetPacketReliability().nackReFlush++;
+			return;
+		}
+		if (current - nextFlushTime >= 0) {// retransmission timeout
+			needFlush = true;
+			rto += stream.getRxRto();// liner increase
+			ManagementGroup.getRakNetPacketReliability().rtoReFlushed++;
+			return;
+		}
+		if (fastAck >= Constants.ACK_FAST_RESENT) {
+			needFlush = true;
+			ManagementGroup.getRakNetPacketReliability().fastReFlushed++;
+		}
 	}
 
 	@Override

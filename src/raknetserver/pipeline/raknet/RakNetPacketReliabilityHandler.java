@@ -46,16 +46,15 @@ public class RakNetPacketReliabilityHandler extends ChannelDuplexHandler {
 
     @Override
     public void channelActive(ChannelHandlerContext ctx) throws Exception {
-        scheduled = ctx.channel().eventLoop().scheduleAtFixedRate(() -> processWindowRto(ctx), Constants.RTO_INTERVAL, Constants.RTO_INTERVAL, TimeUnit.MILLISECONDS);
-        ManagementGroup.getRakNetPacketReliability().handlerActive++;
+        scheduled = ctx.channel().eventLoop().scheduleAtFixedRate(() -> updateWindow(ctx), Constants.RTO_INTERVAL, Constants.RTO_INTERVAL, TimeUnit.MILLISECONDS);
         super.channelActive(ctx);
     }
 
-    private void processWindowRto(ChannelHandlerContext ctx) {
+    private void updateWindow(ChannelHandlerContext ctx) {
         if (sndWindow.isEmpty()) {
             return;
         }
-        long now = System.currentTimeMillis();
+        long current = System.currentTimeMillis();
         RingBuf.Range<RakNetEncapsulatedData> range = sndWindow.iterator();
         for (RakNetEncapsulatedData ele : range) {
             if (sndWindow.isFull()) {
@@ -64,14 +63,13 @@ public class RakNetPacketReliabilityHandler extends ChannelDuplexHandler {
             if (ele.isAck() || ele.getId() != range.id()) {
                 continue;
             }
-            if (ele.isRtoTimeout(now)) {
-                // Utils.debug(String.format("!!! rto_rst=%s,rto=%s,snd=%s", range.id(), ele.getRto(), ele.snd()));
-                ManagementGroup.getRakNetPacketReliability().rtoReFlushed++;
-                sendRakPacket(ctx, ele, now, true);
+            ele.update(this, current);
+            if (ele.isNeedFlush()) {
+                sendRakPacket(ctx, ele, current);
             }
         }
         recycle();
-        flushQueue(ctx, now);
+        if (!flushInProgress) flushQueue(ctx, current);
     }
 
     @Override
@@ -92,33 +90,23 @@ public class RakNetPacketReliabilityHandler extends ChannelDuplexHandler {
     }
 
     public void handleRakNetNACK(ChannelHandlerContext ctx, RakNetNACK packet) {
-        long now = System.currentTimeMillis();
-        for (REntry entry : packet.getEntries()) {
-            // Utils.debug("!!! nack_start=" + entry.idstart + ", end=" + entry.idfinish);
-            handleNAckEntry(ctx, entry, now);
-        }
-        recycle();
-        flushQueue(ctx, now);
+//        for (REntry entry : packet.getEntries()) {
+//            handleNAckEntry(ctx, entry);
+//        }
     }
 
-    private void handleNAckEntry(ChannelHandlerContext ctx, REntry entry, long now) {
+    private void handleNAckEntry(ChannelHandlerContext ctx, REntry entry) {
         if (!sndWindow.contains(entry.idfinish)) {
-            // Utils.debug("!!! outdated nack msg");
             return;
         }
-        // Utils.debug("!!! nack_start=" + entry.idstart + ", end=" + entry.idfinish);
         int bound = UInt.U24.mod(entry.idfinish, 1);
         int i = sndWindow.contains(entry.idstart) ? entry.idstart : sndWindow.first();
         RingBuf.Range<RakNetEncapsulatedData> range = sndWindow.iterator(i, bound);
         for (RakNetEncapsulatedData ele : range) {
-            if (sndWindow.isFull()) {
-                break;
-            }
             if (ele.isAck() || range.id() != ele.getId()) {// already changed
                 continue;
             }
-            ManagementGroup.getRakNetPacketReliability().ackReFlushed++;
-            sendRakPacket(ctx, ele, now, false);// not update rto in nack resend
+            ele.setNeedFlush();
         }
     }
 
@@ -133,10 +121,8 @@ public class RakNetPacketReliabilityHandler extends ChannelDuplexHandler {
 
     private void handleAckEntry(ChannelHandlerContext ctx, REntry entry, long now) {
         if (!sndWindow.contains(entry.idfinish)) {
-            // Utils.debug("!!! outdated ack msg");
             return;
         }
-        // Utils.debug("!!! ack_start=" + entry.idstart + ", end=" + entry.idfinish);
         int bound = UInt.U24.mod(entry.idfinish, 1);
         RingBuf.Range<RakNetEncapsulatedData> range = sndWindow.iterator(sndWindow.first(), bound);
         for (RakNetEncapsulatedData ele : range) {
@@ -144,54 +130,57 @@ public class RakNetPacketReliabilityHandler extends ChannelDuplexHandler {
                 continue;
             }
             if (UInt.U24.between(entry.idstart, bound, range.id())) {
-                int snd = ele.receive();
-                if (snd == 1) {
+                ele.setAck();
+//                int xmit = ele.getXmit();
+//                if (xmit == 1 || sRtt == 0) {
                     updateRxRto(ele.getRtt(now));
-                }
+//                }
                 continue;
             }
-            int i = ele.skip();
-            if (i > Constants.ACK_FAST_RESENT && !sndWindow.isFull()) {
-                // Utils.debug("!!! fast_rst=" + range.id());
-                ManagementGroup.getRakNetPacketReliability().fastReFlushed++;
-                sendRakPacket(ctx, ele, now, false);
-            }
+            ele.setFastAck();
         }
     }
 
     private void recycle() {
-        RakNetEncapsulatedData head = sndWindow.head();
-        if (head == null) {
-            // Utils.debug("!!! recycle_snd_window=" + sndWindow.length());
-            return;
-        }
-        if (head.getId() == sndWindow.first() && !head.isAck()) {
-            // Utils.debug("!!! recycle_snd_window=" + sndWindow.length());
-            return;
-        }
-        sndWindow._shift();
-        recycle();
+        do {
+            RakNetEncapsulatedData head = sndWindow.head();
+            if (head == null) {
+                return;
+            }
+            if (head.getId() == sndWindow.first() && !head.isAck()) {
+                return;
+            }
+            sndWindow._shift();
+        } while (true);
     }
 
     private void flushQueue(ChannelHandlerContext ctx) {
         flushQueue(ctx, System.currentTimeMillis());
     }
 
-    private void flushQueue(ChannelHandlerContext ctx, long now) {
-        if (sendQue.isEmpty()) {
-            onEndFlush();
-            return;
-        }
-        if (sndWindow.length() >= Constants.SND_WINDOW) {
-            onEndFlush();
-            return;
-        }
+    private int msgAppendLen = -1;
 
-        EncapsulatedPacket msg = sendQue.remove();
-        RakNetEncapsulatedData data = new RakNetEncapsulatedData(msg);
+    private void flushQueue(ChannelHandlerContext ctx, long current) {
+        if (msgAppendLen == -1) {
+            msgAppendLen = ctx.channel().attr(RakNetConstants.MTU).get() - 200;
+        }
+        do {
+            if (sendQue.isEmpty()) {
+                onEndFlush(ctx);
+                return;
+            }
+            if (sndWindow.length() >= Constants.SND_WINDOW) {
+                onEndFlush(ctx);
+                return;
+            }
+            sendRakPacket(ctx, msgToDataPacket(msgAppendLen), current);
+        } while (!inactive);// while not inactive
+    }
+
+    private RakNetEncapsulatedData msgToDataPacket(int limit) {
+        RakNetEncapsulatedData data = new RakNetEncapsulatedData(sendQue.remove());
         if (!sendQue.isEmpty()) {
-            int limit = ctx.channel().attr(RakNetConstants.MTU).get() - 200;
-            for (;;) {
+            do {
                 if (data.length() >= limit) {
                     break;
                 }
@@ -200,19 +189,15 @@ public class RakNetPacketReliabilityHandler extends ChannelDuplexHandler {
                     break;
                 }
                 data.append(sendQue.remove());
-                if (sendQue.isEmpty()) {
-                    break;
-                }
-            }
+            } while (!sendQue.isEmpty());
         }
-
-        sendRakPacket(ctx, data, now, true);
-        flushQueue(ctx, now);
+        return data;
     }
 
-    private void onEndFlush() {
+    private void onEndFlush(ChannelHandlerContext ctx) {
         if (flushInProgress) {
             flushInProgress = false;
+            ctx.flush();
         }
     }
 
@@ -230,20 +215,30 @@ public class RakNetPacketReliabilityHandler extends ChannelDuplexHandler {
         rxRto = Utils.bound(Constants.RTO_MIN, sRtt + Math.max(Constants.RTO_INTERVAL, 4 * rxRtt), Constants.RTO_MAX);
     }
 
-    protected void sendRakPacket(ChannelHandlerContext ctx, RakNetEncapsulatedData data, long now, boolean updateRto) {
-        if (data.getRto() == Constants.RTO_MAX) {
-            System.out.println(String.format("!!! snd=%s", data.snd()));
-            throw ReadTimeoutException.INSTANCE;
+    private boolean inactive;
+
+    protected void sendRakPacket(ChannelHandlerContext ctx, RakNetEncapsulatedData data, long current) {
+        if (inactive) {
+            return;
         }
-        int id = sndWindow.add(data);
-        data.set(id, now, rxRto, updateRto);
-        ManagementGroup.getRakNetPacketReliability().packetFlushed++;
-        if (data.snd() == 1) {
+        data.setFlush(this, sndWindow.add(data), current);
+        int xmit = data.getXmit();
+        if (xmit >= Constants.MAX_RETRANSMISSION) {
+            ctx.fireExceptionCaught(ReadTimeoutException.INSTANCE);
+            ctx.close();
+            inactive = true;
+            return;
+        }
+        if (xmit == 1) {
             ManagementGroup.getRakNetPacketReliability().msgToPacket++;
         } else {
             ManagementGroup.getRakNetPacketReliability().packetReFlushed++;
         }
-        ctx.writeAndFlush(data).addListener(ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE);
+        ManagementGroup.getRakNetPacketReliability().packetFlushed++;
+        ctx.write(data, ctx.voidPromise());
+        if (!flushInProgress) {
+            ctx.flush();
+        }
     }
 
     public void handleRakNetEncapsulatedData(ChannelHandlerContext ctx, RakNetEncapsulatedData packet) {
@@ -256,7 +251,6 @@ public class RakNetPacketReliabilityHandler extends ChannelDuplexHandler {
         }
         //send nack for missed packets
         if (delta > 1) {
-            // Utils.debug("!!! snd_nack_start=" + UInt.U24.mod(receiveId, 1) + ", end=" + UInt.U24.mod(id, -1));
             ctx.writeAndFlush(new RakNetNACK(UInt.U24.mod(receiveId, 1), UInt.U24.mod(id, -1))).addListener(ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE);
         }
 
@@ -277,11 +271,15 @@ public class RakNetPacketReliabilityHandler extends ChannelDuplexHandler {
             ManagementGroup.getRakNetPacketReliability().msgQueued++;
             if (!flushInProgress && sndWindow.length() < Constants.SND_WINDOW) {
                 flushInProgress = true;
-                ctx.channel().eventLoop().execute(() -> flushQueue(ctx));
+                ctx.channel().eventLoop().schedule(() -> flushQueue(ctx), Constants.FLUSH_INTERVAL, TimeUnit.MILLISECONDS);
             }
         } else {
             ctx.writeAndFlush(msg, promise);
         }
+    }
+
+    public int getRxRto() {
+        return rxRto;
     }
 
 }

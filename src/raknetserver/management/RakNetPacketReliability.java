@@ -1,23 +1,20 @@
 package raknetserver.management;
 
+import lombok.AllArgsConstructor;
+import lombok.Data;
+
 import javax.management.MalformedObjectNameException;
 import javax.management.ObjectName;
 
 public class RakNetPacketReliability implements RakNetPacketReliabilityMXBean {
 
-    public long msgQueued;
-    public long msgToPacket;
-    public long packetFlushed;
-    public long fastReFlushed;
-    public long ackReFlushed;
-    public long rtoReFlushed;
-    public long packetReFlushed;
-    public long handlerActive;
-
-    @Override
-    public long getHandlerActive() {
-        return handlerActive;
-    }
+    public int msgQueued;
+    public int msgToPacket;
+    public int packetFlushed;
+    public int packetReFlushed;
+    public int fastReFlushed;
+    public int rtoReFlushed;
+    public int nackReFlush;
 
     @Override
     public long getMsgQueued() {
@@ -30,33 +27,18 @@ public class RakNetPacketReliability implements RakNetPacketReliabilityMXBean {
     }
 
     @Override
-    public long getPacketReFlushed() {
-        return packetReFlushed;
-    }
-
-    @Override
     public long getMsgToPacket() {
         return msgToPacket;
     }
 
     @Override
-    public long getAckReFlushed() {
-        return ackReFlushed;
-    }
-
-    @Override
-    public long getRtoReFlushed() {
-        return rtoReFlushed;
-    }
-
-    @Override
-    public long getFastReFlushed() {
-        return fastReFlushed;
+    public ReFlush getReFlush() {
+        return new ReFlush(packetReFlushed, fastReFlushed, rtoReFlushed, nackReFlush);
     }
 
     @Override
     public void reset() {
-        rtoReFlushed = fastReFlushed = ackReFlushed = msgToPacket = msgQueued = packetFlushed = packetReFlushed = handlerActive = 0;
+        nackReFlush = rtoReFlushed = fastReFlushed = msgToPacket = msgQueued = packetFlushed = packetReFlushed = 0;
     }
 
     @Override
@@ -66,6 +48,16 @@ public class RakNetPacketReliability implements RakNetPacketReliabilityMXBean {
         } catch (MalformedObjectNameException e) {
         }
         return null;
+    }
+
+    @Data
+    @AllArgsConstructor
+    public static class ReFlush {
+
+        public int total;
+        public int fastAck;
+        public int rto;
+        public int nack;
     }
 
 }

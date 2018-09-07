@@ -5,7 +5,6 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.DefaultEventLoopGroup;
-import io.netty.handler.flush.FlushConsolidationHandler;
 import io.netty.handler.timeout.ReadTimeoutHandler;
 import raknetserver.pipeline.ecnapsulated.EncapsulatedPacketInboundOrderer;
 import raknetserver.pipeline.ecnapsulated.EncapsulatedPacketOutboundOrder;
@@ -48,8 +47,7 @@ public class RakNetServer {
 			@Override
 			protected void initChannel(Channel channel) throws Exception {
 				channel.pipeline()
-				.addLast("rns-timeout", new ReadTimeoutHandler(30))
-				.addLast("flush-consolidation", new FlushConsolidationHandler())
+				.addLast("rns-timeout", new ReadTimeoutHandler(10))
 				.addLast("rns-rn-encoder", new RakNetPacketEncoder())
 				.addLast("rns-rn-decoder", new RakNetPacketDecoder())
 				.addLast("rns-rn-connect", new RakNetPacketConnectionEstablishHandler(pinghandler))
