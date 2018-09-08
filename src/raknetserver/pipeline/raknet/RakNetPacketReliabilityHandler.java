@@ -270,8 +270,11 @@ public class RakNetPacketReliabilityHandler extends ChannelDuplexHandler {
             sendQue.add((EncapsulatedPacket) msg);
             ManagementGroup.getRakNetPacketReliability().msgQueued++;
             if (!flushInProgress && sndWindow.length() < Constants.SND_WINDOW) {
+                /*
+                 * We delay flush operation 1/10 round trip time
+                 */
+                ctx.channel().eventLoop().schedule(() -> flushQueue(ctx), (sRtt / 10), TimeUnit.MILLISECONDS);
                 flushInProgress = true;
-                ctx.channel().eventLoop().schedule(() -> flushQueue(ctx), Constants.FLUSH_INTERVAL, TimeUnit.MILLISECONDS);
             }
         } else {
             ctx.writeAndFlush(msg, promise);

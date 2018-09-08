@@ -15,6 +15,4 @@ public class Constants {
     public static final int SND_WINDOW = 128;
     public static final int ACK_FAST_RESENT = 3;
     public static final int MAX_RETRANSMISSION = 20;
-
-    public static final int FLUSH_INTERVAL = RTO_INTERVAL / 10;
 }
