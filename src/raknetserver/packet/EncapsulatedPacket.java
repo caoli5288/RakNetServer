@@ -23,7 +23,7 @@ public class EncapsulatedPacket {
 	}
 
 	public EncapsulatedPacket(byte[] data, int messageIndex, int orderChannel, int orderIndex) {
-		this.data = data.clone();
+		this.data = data;
 		this.reliability = 3;
 		this.messageIndex = messageIndex;
 		this.orderChannel = orderChannel;
@@ -130,7 +130,7 @@ public class EncapsulatedPacket {
 	}
 
 	public byte[] getData() {
-		return data.clone();
+		return data;
 	}
 
 }

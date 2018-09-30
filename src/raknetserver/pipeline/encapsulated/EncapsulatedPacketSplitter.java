@@ -1,4 +1,4 @@
-package raknetserver.pipeline.ecnapsulated;
+package raknetserver.pipeline.encapsulated;
 
 import java.util.Arrays;
 import java.util.List;
@@ -18,18 +18,18 @@ public class EncapsulatedPacketSplitter extends MessageToMessageEncoder<Encapsul
 		int mtu = ctx.channel().attr(RakNetConstants.MTU).get();
 		int splitSize = mtu - 200;
 		if (packet.getDataSize() > (mtu - 100)) {
-			EncapsulatedPacket[] epackets = new EncapsulatedPacket[Utils.getSplitCount(packet.getDataSize(), splitSize)];
+			int splitCount = Utils.getSplitCount(packet.getDataSize(), splitSize);
 			int splitID = getNextSplitID();
 			//TODO: direct array split
 			ByteBuf buffer = Unpooled.wrappedBuffer(packet.getData());
-			for (int splitIndex = 0; splitIndex < epackets.length; splitIndex++) {
-				epackets[splitIndex] = new EncapsulatedPacket(
-					Utils.readBytes(buffer, buffer.readableBytes() < splitSize ? buffer.readableBytes() : splitSize),
-					getNextMessageIndex(), packet.getOrderChannel(), packet.getOrderIndex(),
-					splitID, epackets.length, splitIndex
+			for (int splitIndex = 0; splitIndex < splitCount; splitIndex++) {
+				EncapsulatedPacket p = new EncapsulatedPacket(
+						Utils.readBytes(buffer, buffer.readableBytes() < splitSize ? buffer.readableBytes() : splitSize),
+						getNextMessageIndex(), packet.getOrderChannel(), packet.getOrderIndex(),
+						splitID, splitCount, splitIndex
 				);
+				list.add(p);
 			}
-			list.addAll(Arrays.asList(epackets));
 		} else {
 			list.add(new EncapsulatedPacket(packet.getData(), getNextMessageIndex(), packet.getOrderChannel(), packet.getOrderIndex()));
 		}

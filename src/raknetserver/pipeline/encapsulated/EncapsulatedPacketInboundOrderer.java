@@ -1,4 +1,4 @@
-package raknetserver.pipeline.ecnapsulated;
+package raknetserver.pipeline.encapsulated;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -6,6 +6,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 
+import gnu.trove.map.hash.TIntObjectHashMap;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.DecoderException;
@@ -33,7 +34,7 @@ public class EncapsulatedPacketInboundOrderer extends MessageToMessageDecoder<En
 
 	protected static class OrderedChannelPacketQueue {
 
-		private final HashMap<Integer, EncapsulatedPacket> queue = new HashMap<>(300);
+		private final TIntObjectHashMap<EncapsulatedPacket> queue = new TIntObjectHashMap<>(300);
 		private int lastReceivedIndex = -1;
 		private int lastOrderedIndex = -1;
 

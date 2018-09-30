@@ -1,8 +1,9 @@
-package raknetserver.pipeline.ecnapsulated;
+package raknetserver.pipeline.encapsulated;
 
 import java.util.HashMap;
 import java.util.List;
 
+import gnu.trove.map.hash.TIntObjectHashMap;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.MessageToMessageDecoder;
@@ -12,7 +13,7 @@ import raknetserver.utils.Utils;
 
 public class EncapsulatedPacketUnsplitter extends MessageToMessageDecoder<EncapsulatedPacket> {
 
-	private final HashMap<Integer, SplittedPacket> notFullPackets = new HashMap<>();
+	private final TIntObjectHashMap<SplittedPacket> notFullPackets = new TIntObjectHashMap<>();
 
 	@Override
 	protected void decode(ChannelHandlerContext ctx, EncapsulatedPacket packet, List<Object> list) throws Exception {
