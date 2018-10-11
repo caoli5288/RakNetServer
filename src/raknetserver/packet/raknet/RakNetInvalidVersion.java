@@ -5,7 +5,8 @@ import raknetserver.packet.RakNetConstants;
 
 public class RakNetInvalidVersion implements RakNetPacket {
 
-	public static final int VALID_VERSION = 8;
+	public static final int VERSION_8 = 8;
+	public static final int VERSION_9 = 9;
 
 	@Override
 	public void decode(ByteBuf buf) {
@@ -14,9 +15,13 @@ public class RakNetInvalidVersion implements RakNetPacket {
 
 	@Override
 	public void encode(ByteBuf buf) {
-		buf.writeByte(VALID_VERSION);
+		buf.writeByte(VERSION_8);
 		buf.writeBytes(RakNetConstants.MAGIC);
 		buf.writeLong(RakNetConstants.SERVER_ID);
+	}
+
+	public static boolean validate(int version) {
+		return VERSION_8 <= version && version <= VERSION_9;
 	}
 
 }

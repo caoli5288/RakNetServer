@@ -31,6 +31,7 @@ public final class RakNetConstants {
 	public static final int ID_I_CLIENT_DISCONNECT = 0x15;
 
 	public static final AttributeKey<Integer> MTU = AttributeKey.valueOf("MTU");
+	public static final AttributeKey<Integer> VERSION = AttributeKey.valueOf("VERSION");
 	public static final int MAXIMUM_MTU_LEN = 1200;
 	public static final int MINIMUM_MTU_LEN = 576;
 }
